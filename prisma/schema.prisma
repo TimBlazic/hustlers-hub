@@ -1,0 +1,130 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  pfp_url       String?   // Profile picture URL from Supabase storage
+  bio           String?
+  solanaAddress String?   // Solana wallet address
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  sellerGigs    Gig[]    @relation("SellerGigs")
+  buyerOrders   Order[]  @relation("BuyerOrders")
+  sellerOrders  Order[]  @relation("SellerOrders")
+  purchases     Purchase[] @relation("Purchases")
+  messages      OrderMessage[]
+  notifications Notification[]
+}
+
+model Gig {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  price       Float
+  category    String
+  images      String[]
+  sellerId    String
+  seller      User     @relation("SellerGigs", fields: [sellerId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders      Order[]
+  purchases   Purchase[]
+
+  @@index([sellerId])
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  status      OrderStatus  
+  amount      Float    
+  signature   String?  // Solana transaction signature
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  gig         Gig      @relation(fields: [gigId], references: [id])
+  gigId       String
+  buyer       User     @relation("BuyerOrders", fields: [buyerId], references: [id])
+  buyerId     String
+  seller      User     @relation("SellerOrders", fields: [sellerId], references: [id])
+  sellerId    String
+  buyerAddress String?
+
+  messages    OrderMessage[]
+  notifications Notification[]
+
+  @@index([buyerId])
+  @@index([sellerId])
+  @@index([gigId])
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  STARTED
+  IN_PROGRESS
+  REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+model OrderMessage {
+  id        String   @id @default(cuid())
+  content   String
+  createdAt DateTime @default(now())
+  orderId   String
+  userId    String
+  order     Order    @relation(fields: [orderId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+}
+
+model Purchase {
+  id                  String   @id @default(cuid())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  gigId              String
+  gig                Gig      @relation(fields: [gigId], references: [id])
+  
+  buyerId            String
+  buyer              User     @relation("Purchases", fields: [buyerId], references: [id])
+  
+  transactionSignature String
+  buyerAddress        String
+  status              String   // "completed", "pending", "failed"
+  
+  @@index([buyerId])
+  @@index([gigId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  type      String
+  content   String
+  orderId   String
+  userId    String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  order     Order    @relation(fields: [orderId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([orderId])
+} 
